@@ -1,0 +1,46 @@
+# .gitignore for Swift Package / Xcode projects
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+
+# Xcode
+DerivedData/
+*.xcworkspace
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad
+*.moved-aside
+*.pbxuser
+*.mode1v3
+*.perspectivev3
+*.xcscmblueprint
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.iml
+
+# Build output (scripts/build_app.sh, scripts/create_dmg.sh)
+dist/
+
+# Local agent settings
+.claude/
+.codex/
+
+# macOS
+.DS_Store
+
+# Misc
+*.swp
+*~
+*.log
+.env
+.env.*
