@@ -24,7 +24,7 @@ Lyra is a small macOS music player. You point it at the folder where your music 
 
 ![Search](docs/search.png)
 
-**A visualizer you can actually look at.** A sphere of dots that breathes with the music, bass in the middle and highs on the edges, inside a ring that follows the spectrum and pulses on every kick. Or switch to ASCII: the spectrum drawn in characters.
+**A visualizer you can actually look at.** A wave of stepped gray bands that rises with the music, bass in the middle and highs on the edges, and dissolves into ASCII characters at the crest.
 
 ![Visualizer](docs/visualizer.png)
 

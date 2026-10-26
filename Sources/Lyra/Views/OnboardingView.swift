@@ -143,9 +143,12 @@ private extension View {
 
 /// A wave rising from the bottom, drawn as stepped gradient bands that
 /// dissolve upward into ASCII characters. Monochrome ink, so it follows the
-/// light and dark appearance. `lift` (0...1) raises the wave.
+/// light and dark appearance. `lift` (0...1) raises the wave. With a
+/// `spectrum` (band levels, 0...1) the crest follows the music instead:
+/// bass in the middle, highs toward the edges.
 struct AsciiWaveField: View, @preconcurrency Animatable {
     var lift: Double
+    var spectrum: [Float] = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var animatableData: Double {
@@ -171,12 +174,32 @@ struct AsciiWaveField: View, @preconcurrency Animatable {
 
     /// Height of the wave's crest at `x`, measured from the top.
     private func crest(_ x: Double, size: CGSize, time t: Double) -> Double {
+        if !spectrum.isEmpty { return spectrumCrest(x, size: size, time: t) }
         let u = x / max(size.width, 1) * 2 * .pi
         let base = 0.58 - 0.22 * lift
         let wave = 0.110 * sin(u * 1.1 + t * 0.35)
             + 0.055 * sin(u * 2.7 - t * 0.60 + 1.3)
             + 0.025 * sin(u * 6.3 + t * 1.10)
         return (base + wave * (1 + 0.6 * lift)) * size.height
+    }
+
+    /// Low and almost still in silence, rising where the music has energy.
+    private func spectrumCrest(_ x: Double, size: CGSize, time t: Double) -> Double {
+        let u = x / max(size.width, 1)
+        let position = abs(u - 0.5) * 2 * Double(spectrum.count - 1)
+        // Averaged over neighbouring bands, so the crest rolls like a wave
+        // instead of spiking band by band.
+        var level = 0.0, weights = 0.0
+        for offset in -3...3 {
+            let p = position + Double(offset)
+            let i = max(0, min(spectrum.count - 1, Int(p.rounded())))
+            let w = exp(-Double(offset * offset) / 4)
+            level += Double(spectrum[i]) * w
+            weights += w
+        }
+        let energy = pow(max(0, level / weights), 0.75)
+        let idle = 0.018 * sin(u * 2 * .pi * 1.1 + t * 0.35) + 0.010 * sin(u * 2 * .pi * 2.7 - t * 0.6 + 1.3)
+        return (0.80 - 0.58 * energy + idle) * size.height
     }
 
     private func draw(in ctx: inout GraphicsContext, size: CGSize, time t: Double) {
