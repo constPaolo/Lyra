@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import ImageIO
 
 struct Track: Identifiable, Hashable, Sendable {
     let id: UUID
@@ -36,8 +37,40 @@ struct Track: Identifiable, Hashable, Sendable {
         self.artworkData = artworkData
     }
 
+    /// Full-size cover art, decoded on every call. For display use `thumbnail`.
     var artwork: NSImage? {
         artworkData.flatMap { NSImage(data: $0) }
+    }
+
+    /// Cover art downscaled for on-screen use, decoded once and cached.
+    /// Embedded covers are often 1000px+ JPEGs; decoding them on every view
+    /// update made scrolling the track list stutter.
+    var thumbnail: NSImage? {
+        guard let artworkData else { return nil }
+        let key = id.uuidString as NSString
+        if let cached = Self.thumbnails.object(forKey: key) { return cached }
+        guard let image = Self.downscaled(artworkData, maxPixelSize: 320) else { return nil }
+        Self.thumbnails.setObject(image, forKey: key)
+        return image
+    }
+
+    // NSCache is thread-safe.
+    nonisolated(unsafe) private static let thumbnails: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 600
+        return cache
+    }()
+
+    private static func downscaled(_ data: Data, maxPixelSize: Int) -> NSImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
     }
 
     static func == (lhs: Track, rhs: Track) -> Bool { lhs.id == rhs.id }

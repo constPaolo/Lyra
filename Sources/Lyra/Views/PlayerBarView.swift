@@ -4,8 +4,6 @@ import AppKit
 struct PlayerBarView: View {
     @Environment(PlayerViewModel.self) private var vm
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isScrubbing = false
-    @State private var scrubTime: Double = 0
     @State private var showVolumePopover = false
     @State private var volumeBeforeMute: Float = 0.7
 
@@ -27,7 +25,7 @@ struct PlayerBarView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                seekRow
+                SeekRow()
             }
             .padding(.horizontal, 20)
             .padding(.top, 14)
@@ -54,7 +52,7 @@ struct PlayerBarView: View {
 
     private var nowPlaying: some View {
         HStack(spacing: 12) {
-            ArtworkView(image: vm.currentTrack?.artwork, radius: 12)
+            ArtworkView(image: vm.currentTrack?.thumbnail, radius: 12)
                 .frame(width: 44, height: 44)
                 .raisedShadow()
             VStack(alignment: .leading, spacing: 2) {
@@ -116,31 +114,6 @@ struct PlayerBarView: View {
             .help("Next track")
         }
         .fixedSize()
-    }
-
-    // MARK: - Seek
-
-    private var seekRow: some View {
-        let shown = isScrubbing ? scrubTime : vm.currentTime
-        return HStack(spacing: 12) {
-            Text(vm.formatTime(shown))
-                .timeLabel()
-                .rollingDigits(floor(shown))
-            TickSlider(
-                value: vm.duration > 0 ? max(0, min(shown / vm.duration, 1)) : 0,
-                height: 18,
-                onScrub: { f in
-                    isScrubbing = true
-                    scrubTime = f * vm.duration
-                },
-                onCommit: { f in
-                    vm.seek(to: f * vm.duration)
-                    isScrubbing = false
-                }
-            )
-            Text(vm.formattedDuration)
-                .timeLabel()
-        }
     }
 
     // MARK: - Volume
@@ -252,5 +225,38 @@ private extension Text {
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(Theme.secondary)
             .frame(width: 40)
+    }
+}
+
+// MARK: - Seek
+
+/// Its own view so the 10 Hz `currentTime` updates only redraw this row,
+/// not the whole bar.
+private struct SeekRow: View {
+    @Environment(PlayerViewModel.self) private var vm
+    @State private var isScrubbing = false
+    @State private var scrubTime: Double = 0
+
+    var body: some View {
+        let shown = isScrubbing ? scrubTime : vm.currentTime
+        HStack(spacing: 12) {
+            Text(vm.formatTime(shown))
+                .timeLabel()
+                .rollingDigits(floor(shown))
+            TickSlider(
+                value: vm.duration > 0 ? max(0, min(shown / vm.duration, 1)) : 0,
+                height: 18,
+                onScrub: { f in
+                    isScrubbing = true
+                    scrubTime = f * vm.duration
+                },
+                onCommit: { f in
+                    vm.seek(to: f * vm.duration)
+                    isScrubbing = false
+                }
+            )
+            Text(vm.formattedDuration)
+                .timeLabel()
+        }
     }
 }

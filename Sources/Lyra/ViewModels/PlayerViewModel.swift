@@ -403,12 +403,12 @@ final class PlayerViewModel {
 
     /// Artwork from the artist's first track that has some.
     func artistArtwork(_ name: String) -> NSImage? {
-        tracks.first(where: { artistKey(for: $0) == name && $0.artworkData != nil })?.artwork
+        tracks.first(where: { artistKey(for: $0) == name && $0.artworkData != nil })?.thumbnail
     }
 
     /// Cover art for an album — the first track in the album that has artwork.
     func albumArtwork(_ name: String) -> NSImage? {
-        tracks.first(where: { albumKey(for: $0) == name && $0.artworkData != nil })?.artwork
+        tracks.first(where: { albumKey(for: $0) == name && $0.artworkData != nil })?.thumbnail
     }
 
     // MARK: - Browse page descriptors
@@ -1164,8 +1164,15 @@ final class PlayerViewModel {
         return max(pathCount - rootCount, 0)
     }
 
+    /// Resolving symlinks hits the file system; rows ask for this on every
+    /// redraw (via `isLiked`), so remember the answer per URL.
+    @ObservationIgnored private var normalizedPaths: [URL: String] = [:]
+
     private func normalizedPath(for url: URL) -> String {
-        url.standardizedFileURL.resolvingSymlinksInPath().path
+        if let cached = normalizedPaths[url] { return cached }
+        let path = url.standardizedFileURL.resolvingSymlinksInPath().path
+        normalizedPaths[url] = path
+        return path
     }
 
     private func persistLibraryFolders() {

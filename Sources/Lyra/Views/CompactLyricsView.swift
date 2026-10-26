@@ -88,7 +88,7 @@ struct CompactLyricsView: View {
 
     private func compactTrackRow(_ track: Track) -> some View {
         HStack(spacing: 8) {
-            ArtworkView(image: track.artwork, radius: 7)
+            ArtworkView(image: track.thumbnail, radius: 7)
                 .frame(width: 30, height: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(track.title)

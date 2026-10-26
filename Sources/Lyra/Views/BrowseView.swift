@@ -595,7 +595,7 @@ private struct TopResultTile: View {
         case .album(let a):
             ArtworkView(image: vm.albumArtwork(a.name), radius: 14, glyph: "square.stack")
         case .track(let t):
-            ArtworkView(image: t.artwork, radius: 14)
+            ArtworkView(image: t.thumbnail, radius: 14)
         case .playlist:
             ArtworkView(image: nil, radius: 14, glyph: "music.note.list")
         }
@@ -788,7 +788,7 @@ private struct TrackTile: View {
 
     var body: some View {
         ArtworkTile(
-            artwork: track.artwork,
+            artwork: track.thumbnail,
             glyph: "music.note",
             title: track.title,
             subtitle: track.artist == "Unknown Artist" ? track.album : track.artist,
@@ -840,7 +840,7 @@ struct TrackRow: View {
                 }
                 .frame(width: 40, height: 40)
             } else {
-                ArtworkView(image: track.artwork)
+                ArtworkView(image: track.thumbnail)
                     .frame(width: 40, height: 40)
                     .overlay {
                         if isActive && vm.isPlaying {
@@ -873,18 +873,19 @@ struct TrackRow: View {
                     .frame(maxWidth: 220, alignment: .leading)
             }
 
+            let isLiked = vm.isLiked(track)
             Button {
                 vm.toggleLiked(track)
             } label: {
-                Image(systemName: vm.isLiked(track) ? "heart.fill" : "heart")
+                Image(systemName: isLiked ? "heart.fill" : "heart")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(vm.isLiked(track) ? Theme.ink : Theme.tertiary)
+                    .foregroundStyle(isLiked ? Theme.ink : Theme.tertiary)
                     .frame(width: 30, height: 30)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .opacity(vm.isLiked(track) || isHovered ? 1 : 0)
-            .help(vm.isLiked(track) ? "Unlike" : "Like")
+            .opacity(isLiked || isHovered ? 1 : 0)
+            .help(isLiked ? "Unlike" : "Like")
 
             Text(vm.formatTime(track.duration))
                 .font(.system(size: 12, weight: .medium).monospacedDigit())
