@@ -210,6 +210,13 @@ final class PlayerViewModel {
     private let lyricsService = LyricsService()
     private let updateService = UpdateService()
     private let visualizer = AudioVisualizer()
+    /// Every listen, for the Recap page.
+    let history = ListeningHistory()
+    /// Seconds heard of the current song so far, and where playback was at
+    /// the last tick (to skip seeks).
+    @ObservationIgnored private var listenSeconds: Double = 0
+    @ObservationIgnored private var listenStart = Date()
+    @ObservationIgnored private var lastListenTick: Double?
     private var visualizerTimer: Timer?
 
     // MARK: - Window pin
@@ -596,7 +603,7 @@ final class PlayerViewModel {
         case .album(let name):  selectedSource = .album(name: name)
         case .folder(let path): selectedSource = .folder(path: path)
         case .playlist(let id): selectedSource = .playlist(id: id)
-        case .home, .artistsIndex, .albumsIndex, .foldersIndex, .playlistsIndex, .queue:
+        case .home, .artistsIndex, .albumsIndex, .foldersIndex, .playlistsIndex, .queue, .recap:
             break   // home/index/queue pages don't drive the track list
         }
     }
@@ -646,6 +653,7 @@ final class PlayerViewModel {
         case .foldersIndex, .folder:     return .folders
         case .playlistsIndex, .playlist: return .playlists
         case .queue:                     return .queue
+        case .recap:                     return .recap
         }
     }
 
@@ -757,6 +765,7 @@ final class PlayerViewModel {
     // MARK: - Playback
 
     func play(track: Track, queue: [Track]? = nil) {
+        commitListen()
         lyricsTask?.cancel()
         removeObservers()
         prepareQueueForPlayback(startingWith: track, base: queue)
@@ -1201,6 +1210,7 @@ final class PlayerViewModel {
         ) { [weak self] time in
             Task { @MainActor [weak self] in
                 guard let self, self.isPlaying else { return }
+                self.countListening(to: time.seconds)
                 self.currentTime = time.seconds
                 self.updateCurrentLyric()
                 // Now Playing only needs the position about once a second.
@@ -1217,8 +1227,32 @@ final class PlayerViewModel {
             object: item,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.advanceToNextTrack(triggeredByEnd: true) }
+            Task { @MainActor [weak self] in
+                self?.commitListen()
+                self?.advanceToNextTrack(triggeredByEnd: true)
+            }
         }
+    }
+
+    // MARK: - Listening history
+
+    /// Adds the time since the last tick, unless it was a seek or a stall.
+    private func countListening(to time: Double) {
+        if let last = lastListenTick {
+            let delta = time - last
+            if delta > 0, delta < 1 { listenSeconds += delta }
+        }
+        lastListenTick = time
+    }
+
+    /// Records the current song's listen (if long enough) and starts a new one.
+    func commitListen() {
+        if let track = currentTrack {
+            history.record(track, seconds: listenSeconds, duration: duration, start: listenStart)
+        }
+        listenSeconds = 0
+        lastListenTick = nil
+        listenStart = Date()
     }
 
     private func removeObservers() {

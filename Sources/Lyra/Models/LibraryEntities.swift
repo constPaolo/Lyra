@@ -48,6 +48,7 @@ enum SidebarTab: Hashable {
     case folders
     case playlists
     case queue
+    case recap
 }
 
 /// What the main browse area is currently showing — either an index list
@@ -65,6 +66,7 @@ enum BrowsePage: Hashable {
     case playlistsIndex
     case playlist(id: UUID)
     case queue
+    case recap
 }
 
 struct ArtistGroup: Identifiable, Hashable {

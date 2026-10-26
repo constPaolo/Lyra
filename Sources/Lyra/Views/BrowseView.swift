@@ -34,6 +34,7 @@ struct BrowseView: View {
             case .foldersIndex:    foldersIndex
             case .playlistsIndex:  playlistsIndex
             case .queue:           queuePage
+            case .recap:           RecapView()
             }
         }
     }
@@ -657,7 +658,7 @@ private struct ArtistTile: View {
 
 // MARK: - Page header
 
-private struct PageHeader<Actions: View>: View {
+struct PageHeader<Actions: View>: View {
     let kicker: String
     let title: String
     let subtitle: String

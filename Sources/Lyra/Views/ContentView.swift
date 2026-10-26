@@ -60,6 +60,11 @@ struct ContentView: View {
         }
         // Global keyboard shortcuts
         .lyraKeyboardShortcuts(vm: vm)
+        // Don't lose the listen in progress when quitting.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            vm.commitListen()
+            vm.history.saveNow()
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView(isPresented: $showSettings)
                 .environment(vm)

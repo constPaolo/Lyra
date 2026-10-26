@@ -4,7 +4,8 @@
 #
 # It runs a copy of the binary named "LyraDemo", which keeps its own
 # preferences (seeded from yours), so your history, likes and volume aren't
-# touched. Songs play muted. The app comes to the front for each shot:
+# touched. Songs play muted. The Recap shot uses made-up listening history,
+# written only to LyraDemo's own history file (deleted at the end). The app comes to the front for each shot:
 # don't type while it runs (about a minute).
 set -euo pipefail
 
@@ -55,11 +56,15 @@ shot album       7  -LyraDemoAppearance light -LyraDemo album -LyraDemoPlay "Lev
 shot albums-dark 7  -LyraDemoAppearance dark  -LyraDemo albums -LyraDemoPlay "Level Up"
 shot playlist    7  -LyraDemoAppearance light -LyraDemo "playlist:Late Night Coding" -LyraDemoPlay "Weird Fishes"
 shot settings    7  -LyraDemoAppearance light -LyraDemo settings
+shot recap       7  -LyraDemoAppearance light -LyraDemo recap -LyraDemoSeedHistory YES -LyraDemoPlay "Let It Happen" -LyraDemoSeek 49
 
 # Onboarding needs an empty library.
 defaults delete LyraDemo >/dev/null 2>&1 || true
 shot onboarding  5  -LyraDemoAppearance light -LyraDemo onboarding
 
+# The app writes its preferences back as it quits: give it a moment.
+sleep 2
 defaults delete LyraDemo >/dev/null 2>&1 || true
+rm -rf "$HOME/Library/Application Support/LyraDemo"
 rm -f "$BIN_DIR/LyraDemo"
 rm -rf "$TMP_DIR"

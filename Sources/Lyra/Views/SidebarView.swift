@@ -19,6 +19,7 @@ struct SidebarView: View {
                     navRow(.artists, icon: "music.mic", title: "Artists", count: vm.artists.count)
                     navRow(.folders, icon: "folder", title: "Folders", count: vm.browsableFolders.count)
                     navRow(.queue, icon: "list.bullet", title: "Queue", count: vm.upNextTracks.count)
+                    navRow(.recap, icon: "chart.bar", title: "Recap", count: nil)
                 }
                 .padding(.horizontal, 12)
                 // Below the top row, which holds the traffic lights and the toggle.
@@ -64,6 +65,7 @@ struct SidebarView: View {
         case .folders:   return .foldersIndex
         case .playlists: return .playlistsIndex
         case .queue:     return .queue
+        case .recap:     return .recap
         }
     }
 

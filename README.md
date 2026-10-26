@@ -28,6 +28,10 @@ Lyra is a small macOS music player. You point it at the folder where your music 
 
 ![Visualizer](docs/visualizer.png)
 
+**A recap of your listening.** Lyra remembers what you play (on your Mac, nowhere else) and turns it into a recap for the last 7 days, 30 days or all time: hours listened, top artists and songs, when in the day you listen, your streak, a few highlights in plain words, and badges to unlock.
+
+![Recap](docs/recap.png)
+
 **And the rest you'd expect.** Albums, artists, folders, liked songs, playlists, a queue, shuffle and repeat. A tiny always-on-top window for lyrics while you work. Media keys and Control Center. Light and dark mode.
 
 | | |
