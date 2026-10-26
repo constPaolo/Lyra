@@ -226,18 +226,25 @@ private struct SidebarRow: View {
 
 // MARK: - Logo
 
-/// Ink rounded square with a waveform glyph.
+/// The app icon (ASCII note on a dark tile), sized by its tile.
 struct LyraMark: View {
     var size: CGFloat = 26
 
+    private static let icon: NSImage? =
+        Bundle.module.url(forResource: "AppIcon", withExtension: "png").flatMap(NSImage.init(contentsOf:))
+
     var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.32, style: .continuous)
-            .fill(Theme.ink)
-            .frame(width: size, height: size)
-            .overlay(
-                Image(systemName: "waveform")
-                    .font(.system(size: size * 0.48, weight: .semibold))
-                    .foregroundStyle(Theme.canvas)
-            )
+        if let icon = Self.icon {
+            // The tile is 824 of the icon's 1024 px; the rest is margin and shadow.
+            Image(nsImage: icon)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: size * 1024 / 824, height: size * 1024 / 824)
+                .frame(width: size, height: size)
+        } else {
+            RoundedRectangle(cornerRadius: size * 0.32, style: .continuous)
+                .fill(Theme.ink)
+                .frame(width: size, height: size)
+        }
     }
 }
