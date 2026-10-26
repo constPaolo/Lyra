@@ -16,6 +16,9 @@ enum Theme {
     static let chip = ink.opacity(0.06)
     static let hairline = ink.opacity(0.08)
 
+    /// Height of the window's top row: traffic lights, sidebar toggle, search.
+    static let topBarHeight: CGFloat = 52
+
     enum Radius {
         static let tile: CGFloat = 28
         static let card: CGFloat = 16

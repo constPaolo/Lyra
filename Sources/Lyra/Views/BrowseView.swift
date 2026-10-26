@@ -50,7 +50,10 @@ struct BrowseView: View {
                 hero
                     .padding(.top, 36)
 
-                quickChips
+                // The sidebar already lists these; show them only when it's hidden.
+                if !vm.isSidebarVisible {
+                    quickChips
+                }
 
                 if !vm.recentlyPlayed.isEmpty {
                     tileSection(title: "Recently played", seeAll: nil) {
@@ -62,7 +65,7 @@ struct BrowseView: View {
 
                 if !vm.likedTracks.isEmpty {
                     tileSection(title: "Liked", seeAll: { vm.browsePage = .liked }) {
-                        ForEach(Array(vm.likedTracks.prefix(4))) { track in
+                        ForEach(Array(vm.likedTracks.prefix(12))) { track in
                             TrackTile(track: track) { vm.play(track: track, queue: vm.likedTracks) }
                         }
                     }
@@ -70,7 +73,7 @@ struct BrowseView: View {
 
                 if !vm.albums.isEmpty {
                     tileSection(title: "Albums", seeAll: { vm.browsePage = .albumsIndex }) {
-                        ForEach(Array(vm.albums.prefix(8))) { album in
+                        ForEach(Array(vm.albums.prefix(12))) { album in
                             AlbumTile(album: album, artwork: vm.albumArtwork(album.name)) {
                                 vm.browsePage = .album(name: album.name)
                             }
@@ -158,9 +161,17 @@ struct BrowseView: View {
                         .foregroundStyle(Theme.secondary)
                 }
             }
-            LazyVGrid(columns: tileColumns, alignment: .leading, spacing: 12) {
-                content()
+            // One horizontal shelf per section, like a music store row.
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    Group { content() }
+                        .frame(width: 196)
+                }
+                .scrollTargetLayout()
             }
+            .scrollTargetBehavior(.viewAligned)
+            .contentMargins(.horizontal, 28, for: .scrollContent)
+            .padding(.horizontal, -28)
         }
     }
 

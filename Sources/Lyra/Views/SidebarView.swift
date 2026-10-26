@@ -57,9 +57,9 @@ struct SidebarView: View {
         }
         .padding(.leading, 20)
         .padding(.trailing, 14)
-        // Lines up with the search bar row.
-        .padding(.top, 17)
-        .padding(.bottom, 22)
+        // Below the top row, which holds the traffic lights and the toggle.
+        .padding(.top, Theme.topBarHeight + 4)
+        .padding(.bottom, 18)
     }
 
     // MARK: - Navigation

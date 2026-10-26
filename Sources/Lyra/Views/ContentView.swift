@@ -38,6 +38,12 @@ struct ContentView: View {
             resizeWindowForMode(compact: compact)
         }
         .task {
+            // SwiftUI focuses the search field once the window is key; take it
+            // back so typing Space plays instead of landing in the field.
+            try? await Task.sleep(for: .milliseconds(250))
+            if vm.searchText.isEmpty { NSApp.keyWindow?.makeFirstResponder(nil) }
+        }
+        .task {
             vm.setupRemoteCommands()
             vm.applyWindowPin()
             if vm.isCompactMode { applyCompactConstraints() } else { applyFullConstraints() }
@@ -105,13 +111,13 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "sidebar.left")
             }
-            .buttonStyle(CircleIconButtonStyle(isActive: false, size: 26))
+            .buttonStyle(CircleIconButtonStyle())
             .help(vm.isSidebarVisible ? "Hide sidebar" : "Show sidebar")
-            .padding(.leading, 80)
-            .padding(.top, 1)
-            // The layout starts below the hidden title bar; this sits inside it.
-            .ignoresSafeArea(edges: .top)
+            .frame(height: Theme.topBarHeight)
+            .padding(.leading, 84)
         }
+        // The top bar shares the title bar row with the traffic lights.
+        .ignoresSafeArea(edges: .top)
     }
 
     // MARK: - Main top bar
@@ -152,7 +158,7 @@ struct ContentView: View {
             }
         }
         .padding(.horizontal, 20)
-        .frame(height: 60)
+        .frame(height: Theme.topBarHeight)
         .animation(reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.18), value: vm.mainView)
     }
 
@@ -203,6 +209,7 @@ struct ContentView: View {
             guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
             window.minSize = CGSize(width: 160, height: 200)
             window.maxSize = CGSize(width: 500, height: 900)
+            Self.configureTitlebar(window, compact: true)
         }
     }
 
@@ -214,6 +221,21 @@ struct ContentView: View {
             window.minSize = CGSize(width: 750, height: 520)
             window.maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude,
                                     height: CGFloat.greatestFiniteMagnitude)
+            Self.configureTitlebar(window, compact: false)
+        }
+    }
+
+    /// An empty unified toolbar makes the title bar as tall as the top bar, so
+    /// the traffic lights line up with the sidebar toggle and the search pill.
+    /// Compact mode drops it to keep the small window's chrome minimal.
+    private static func configureTitlebar(_ window: NSWindow, compact: Bool) {
+        if compact {
+            window.toolbar = nil
+        } else if window.toolbar == nil {
+            window.toolbar = NSToolbar(identifier: "lyra.main")
+            window.toolbarStyle = .unified
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
         }
     }
 
@@ -228,6 +250,7 @@ struct ContentView: View {
         if compact {
             // Save current full-mode frame before switching
             saveFrame(window.frame, key: Self.fullFrameKey)
+            Self.configureTitlebar(window, compact: true)
 
             window.minSize = CGSize(width: 160, height: 200)
             window.maxSize = CGSize(width: 500, height: 900)
@@ -238,6 +261,7 @@ struct ContentView: View {
         } else {
             // Save current compact frame before switching
             saveFrame(window.frame, key: Self.compactFrameKey)
+            Self.configureTitlebar(window, compact: false)
 
             window.minSize = CGSize(width: 1, height: 1)
             window.maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude,
