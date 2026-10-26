@@ -24,7 +24,7 @@ Lyra is a small macOS music player. You point it at the folder where your music 
 
 ![Search](docs/search.png)
 
-**A visualizer you can actually look at.** A sphere of dots that breathes with the music: bass in the middle, highs on the edges.
+**A visualizer you can actually look at.** A sphere of dots that breathes with the music, bass in the middle and highs on the edges, inside a ring that follows the spectrum and pulses on every kick. Or switch to ASCII: the spectrum drawn in characters.
 
 ![Visualizer](docs/visualizer.png)
 
@@ -33,6 +33,7 @@ Lyra is a small macOS music player. You point it at the folder where your music 
 | | |
 |---|---|
 | ![Album](docs/album.png) | ![Albums in dark mode](docs/albums-dark.png) |
+| ![Playlist](docs/playlist.png) | ![Settings](docs/settings.png) |
 
 ## How it's made
 
@@ -54,6 +55,12 @@ Or open `Package.swift` in Xcode. To build a real `.app` and a `.dmg`:
 
 ```bash
 ./scripts/release_dmg.sh
+```
+
+To retake the screenshots in `docs/` (debug build, songs play muted, your own history and settings aren't touched):
+
+```bash
+./scripts/readme_screenshots.sh
 ```
 
 Tests (lyrics parsing, matching and search ranking):

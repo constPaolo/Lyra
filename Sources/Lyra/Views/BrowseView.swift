@@ -89,7 +89,8 @@ struct BrowseView: View {
 
     private var hero: some View {
         VStack(spacing: 16) {
-            Kicker(text: librarySummary)
+            LyraMark(size: 64)
+                .padding(.bottom, 4)
             Text(greeting)
                 .font(Theme.display(40))
                 .tracking(Theme.displayTracking(40))
@@ -182,13 +183,6 @@ struct BrowseView: View {
         case 18..<23: return "Good evening"
         default:      return "Late night listening"
         }
-    }
-
-    private var librarySummary: String {
-        let t = vm.tracks.count
-        let a = vm.artists.count
-        guard t > 0 else { return "Empty library" }
-        return "\(t) \(t == 1 ? "track" : "tracks") · \(a) \(a == 1 ? "artist" : "artists")"
     }
 
     // MARK: - Track collection

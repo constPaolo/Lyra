@@ -837,6 +837,14 @@ final class PlayerViewModel {
         UserDefaults.standard.set(volume, forKey: Self.defaults.volume)
     }
 
+    #if DEBUG
+    /// Demo mode: silence the output without touching the volume setting.
+    /// (Not `isMuted`: that also silences the visualizer's tap.)
+    func muteOutputForDemo() {
+        player?.volume = 0
+    }
+    #endif
+
     func toggleShuffle() {
         isShuffleEnabled.toggle()
     }

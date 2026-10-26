@@ -46,10 +46,16 @@ struct ContentView: View {
             if vm.searchText.isEmpty { NSApp.keyWindow?.makeFirstResponder(nil) }
         }
         .task {
+            #if DEBUG
+            DemoMode.prepare()
+            #endif
             vm.setupRemoteCommands()
             vm.applyWindowPin()
             if vm.isCompactMode { applyCompactConstraints() } else { applyFullConstraints() }
             await vm.restoreLastFolder()
+            #if DEBUG
+            await DemoMode.run(vm) { showSettings = true }
+            #endif
             await vm.runPostLaunchTasks()
         }
         // Global keyboard shortcuts
@@ -84,6 +90,15 @@ struct ContentView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Scrolling content fades out under the top bar instead
+                    // of running behind the search pill.
+                    .mask {
+                        VStack(spacing: 0) {
+                            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 20)
+                            Color.black
+                        }
+                    }
                     .transition(.opacity)
 
                     if vm.currentTrack != nil {

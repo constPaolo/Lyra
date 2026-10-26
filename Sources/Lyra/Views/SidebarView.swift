@@ -10,7 +10,6 @@ struct SidebarView: View {
     var body: some View {
         ZStack {
             VStack(alignment: .leading, spacing: 0) {
-                header
 
                 VStack(alignment: .leading, spacing: 2) {
                     navRow(.home, icon: "house", title: "Home", count: nil)
@@ -22,6 +21,8 @@ struct SidebarView: View {
                     navRow(.queue, icon: "list.bullet", title: "Queue", count: vm.upNextTracks.count)
                 }
                 .padding(.horizontal, 12)
+                // Below the top row, which holds the traffic lights and the toggle.
+                .padding(.top, Theme.topBarHeight + 10)
 
                 playlistsSection
                     .padding(.top, 22)
@@ -38,28 +39,6 @@ struct SidebarView: View {
         }
         .background(Theme.canvas)
         .animation(reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.28, dampingFraction: 0.86), value: showDebug)
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        HStack(spacing: 10) {
-            LyraMark(size: 26)
-            Text("Lyra")
-                .font(.system(size: 16, weight: .semibold))
-            ZStack {
-                if vm.isScanning {
-                    ProgressView().controlSize(.small).scaleEffect(0.7)
-                }
-            }
-            .frame(width: 16, height: 16)
-            Spacer()
-        }
-        .padding(.leading, 20)
-        .padding(.trailing, 14)
-        // Below the top row, which holds the traffic lights and the toggle.
-        .padding(.top, Theme.topBarHeight + 4)
-        .padding(.bottom, 18)
     }
 
     // MARK: - Navigation
@@ -153,6 +132,10 @@ struct SidebarView: View {
                 .buttonStyle(CircleIconButtonStyle(isActive: showDebug))
                 .help("Debug panel")
             Spacer()
+            if vm.isScanning {
+                ProgressView().controlSize(.small)
+                    .help("Scanning library…")
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)

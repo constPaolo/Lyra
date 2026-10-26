@@ -6,6 +6,7 @@ struct PlayerBarView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showVolumePopover = false
     @State private var volumeBeforeMute: Float = 0.7
+    @State private var isHoveringNowPlaying = false
 
     var body: some View {
         GeometryReader { geo in
@@ -52,17 +53,31 @@ struct PlayerBarView: View {
 
     private var nowPlaying: some View {
         HStack(spacing: 12) {
-            ArtworkView(image: vm.currentTrack?.thumbnail, radius: 12)
-                .frame(width: 44, height: 44)
-                .raisedShadow()
+            // Artwork and title open the playing song (lyrics view); the
+            // artist name still jumps to the artist.
+            Button(action: openNowPlaying) {
+                ArtworkView(image: vm.currentTrack?.thumbnail, radius: 12)
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        if isHoveringNowPlaying {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(.black.opacity(0.4))
+                            Image(systemName: vm.mainView == .lyrics ? "chevron.down" : "chevron.up")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .raisedShadow()
+            }
+            .buttonStyle(GlyphButtonStyle())
+            .help(vm.mainView == .lyrics ? "Back to library" : "Open now playing")
             VStack(alignment: .leading, spacing: 2) {
                 Text(vm.currentTrack?.title ?? "Nothing playing")
                     .font(.system(size: 14, weight: .medium))
                     .lineLimit(1)
-                    .onTapGesture {
-                        if let track = vm.currentTrack { vm.goToAlbum(of: track) }
-                    }
-                    .help("Go to album")
+                    .underline(isHoveringNowPlaying)
+                    .onTapGesture(perform: openNowPlaying)
+                    .help("Open now playing")
                 Text(vm.currentTrack?.artist ?? "—")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.secondary)
@@ -71,6 +86,12 @@ struct PlayerBarView: View {
                         if let track = vm.currentTrack { vm.goToArtist(of: track) }
                     }
                     .help("Go to artist")
+            }
+            .contextMenu {
+                if let track = vm.currentTrack {
+                    Button("Go to Album") { vm.goToAlbum(of: track) }
+                    Button("Go to Artist") { vm.goToArtist(of: track) }
+                }
             }
             if let track = vm.currentTrack {
                 Button { vm.toggleLiked(track) } label: {
@@ -83,6 +104,16 @@ struct PlayerBarView: View {
                 .buttonStyle(.plain)
                 .help(vm.isLiked(track) ? "Unlike" : "Like")
             }
+        }
+        .onHover { isHoveringNowPlaying = $0 }
+        .animation(.easeInOut(duration: 0.12), value: isHoveringNowPlaying)
+    }
+
+    /// Toggles between the playing song's lyrics and the library.
+    private func openNowPlaying() {
+        guard vm.currentTrack != nil else { return }
+        withAnimation(reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.2)) {
+            vm.mainView = vm.mainView == .lyrics ? .browse : .lyrics
         }
     }
 
