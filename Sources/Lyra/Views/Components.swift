@@ -7,15 +7,17 @@ import AppKit
 struct PillButtonStyle: ButtonStyle {
     enum Kind { case primary, secondary }
     var kind: Kind = .primary
+    /// `true` for the one main call to action on a screen.
+    var isLarge = false
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: .medium))
+            .font(.system(size: isLarge ? 16 : 14, weight: isLarge ? .semibold : .medium))
             .lineLimit(1)
             .foregroundStyle(kind == .primary ? Theme.canvas : Theme.ink)
-            .padding(.horizontal, 18)
-            .frame(height: 36)
+            .padding(.horizontal, isLarge ? 28 : 18)
+            .frame(height: isLarge ? 50 : 36)
             .background(
                 Capsule().fill(kind == .primary ? AnyShapeStyle(Theme.ink) : AnyShapeStyle(Theme.chip))
             )

@@ -3,7 +3,6 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var vm = PlayerViewModel()
-    @State private var showFolderPicker = false
     @State private var showSettings = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -16,7 +15,10 @@ struct ContentView: View {
                 CompactLyricsView()
                     .transition(.opacity.animation(reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.22)))
             } else if vm.tracks.isEmpty && vm.libraryFolders.isEmpty && !vm.isScanning {
-                emptyState
+                OnboardingView(onChooseFolder: openFolderPicker) { url in
+                    Task { await vm.loadFolder(url) }
+                }
+                .transition(.opacity.animation(reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.28)))
             } else {
                 fullLayout
                     .transition(.opacity.animation(reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.28)))
@@ -49,13 +51,6 @@ struct ContentView: View {
             if vm.isCompactMode { applyCompactConstraints() } else { applyFullConstraints() }
             await vm.restoreLastFolder()
             await vm.runPostLaunchTasks()
-            if vm.libraryFolders.isEmpty && !vm.isCompactMode { showFolderPicker = true }
-        }
-        .onChange(of: showFolderPicker) { _, show in
-            if show {
-                openFolderPicker()
-                showFolderPicker = false
-            }
         }
         // Global keyboard shortcuts
         .lyraKeyboardShortcuts(vm: vm)
@@ -173,26 +168,6 @@ struct ContentView: View {
         }
         .buttonStyle(CircleIconButtonStyle(isActive: isActive))
         .help(help)
-    }
-
-    // MARK: - Placeholders
-
-    private var emptyState: some View {
-        VStack(spacing: 20) {
-            Kicker(text: "Lyra")
-            Text("Your music, synced lyrics.")
-                .font(Theme.display(40))
-                .tracking(Theme.displayTracking(40))
-            Text("A local music player for macOS.\nPick the folder where your music lives to get started.")
-                .font(.system(size: 15, weight: .regular))
-                .foregroundStyle(Theme.secondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-            Button("Choose music folder") { openFolderPicker() }
-                .buttonStyle(PillButtonStyle())
-                .padding(.top, 4)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Window resize for compact mode

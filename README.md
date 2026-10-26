@@ -6,6 +6,14 @@ Lyra is a small macOS music player. You point it at the folder where your music 
 
 ![Home](docs/home.png)
 
+## Getting started
+
+![Onboarding](docs/onboarding.png)
+
+1. **Choose your music folder**, or drag it onto the window. MP3, FLAC, M4A, AIFF and WAV, subfolders included.
+2. **Lyra organizes it.** It reads the tags and sorts everything into artists and albums, in track order, with covers. Your files aren't moved or renamed.
+3. **Press play.** Lyrics are found and synced on their own.
+
 ## What it does
 
 **Lyrics that follow the song.** Lyra finds synced lyrics online ([lrclib.net](https://lrclib.net)) and highlights each line as it's sung. Click a line to jump there. If a song isn't found, it tries cleaner versions of the title and artist (without "feat.", "remastered", and so on) and picks the best match. Lyrics are saved next to the song, so they also work offline.
