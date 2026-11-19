@@ -4,6 +4,7 @@ import SwiftUI
 /// playlists / queue) or a track collection, driven by `vm.browsePage`.
 struct BrowseView: View {
     @Environment(PlayerViewModel.self) private var vm
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let tileColumns = [GridItem(.adaptive(minimum: 200, maximum: 280), spacing: 12)]
 
@@ -195,7 +196,7 @@ struct BrowseView: View {
             return nil
         }()
 
-        return VStack(alignment: .leading, spacing: 0) {
+        return ScrollViewReader { proxy in VStack(alignment: .leading, spacing: 0) {
             PageHeader(
                 kicker: vm.selectedSourceSubtitle,
                 title: vm.selectedSourceTitle,
@@ -212,8 +213,18 @@ struct BrowseView: View {
                         Label("Shuffle", systemImage: "shuffle")
                     }
                     .buttonStyle(PillButtonStyle(kind: .secondary))
+                    // The playing song is in this album/folder/list: jump to it
+                    if vm.isCurrentTrackInList {
+                        Button { vm.requestScrollToCurrentTrack() } label: {
+                            Label("Go to Song", systemImage: "scope")
+                        }
+                        .buttonStyle(PillButtonStyle(kind: .secondary))
+                        .help("Scroll to the song that's playing")
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    }
                 }
                 .disabled(vm.filteredTracks.isEmpty)
+                .animation(.easeInOut(duration: 0.2), value: vm.isCurrentTrackInList)
             }
 
             if vm.filteredTracks.isEmpty {
@@ -226,8 +237,10 @@ struct BrowseView: View {
                                 track: track,
                                 leadingNumber: isAlbumPage ? (track.trackNumber ?? index + 1) : nil
                             )
+                            .id(track.id)
                             .onTapGesture { vm.play(track: track) }
-                            .contextMenu { trackMenu(track) }
+                            .contextMenu { TrackMenuItems(track: track) }
+                            .trackDraggable(track, vm: vm)
                         }
                     }
                     .padding(.horizontal, 20)
@@ -235,28 +248,25 @@ struct BrowseView: View {
                 }
             }
         }
+        // "Go to Song", or arriving from the album/artist of the playing song
+        .onChange(of: vm.scrollToCurrentRequest) { scrollToCurrent(proxy) }
+        .onAppear { if vm.scrollToCurrentRequest > handledScrollRequest { scrollToCurrent(proxy) } }
+        }
     }
 
-    @ViewBuilder
-    private func trackMenu(_ track: Track) -> some View {
-        Button("Play") { vm.play(track: track) }
-        Button("Play Next") { vm.enqueueNext(track) }
-        Button("Add to Queue") { vm.enqueueLast(track) }
-        Button(vm.isLiked(track) ? "Unlike" : "Like") { vm.toggleLiked(track) }
-        Divider()
-        Button("Go to Artist") { vm.goToArtist(of: track) }
-        Button("Go to Album") { vm.goToAlbum(of: track) }
-        Divider()
-        if !vm.playlists.isEmpty {
-            Menu("Add to Playlist") {
-                ForEach(vm.playlists) { playlist in
-                    Button(playlist.name) { vm.addTrack(track, toPlaylist: playlist.id) }
-                }
-            }
-        }
-        if case .playlist(let playlistID) = vm.selectedSource {
-            Button("Remove from This Playlist", role: .destructive) {
-                vm.removeTrack(track, fromPlaylist: playlistID)
+    /// Last scroll request served: a page that appears after a request (Go
+    /// to Album from the player bar) serves it once, then ignores it
+    @State private var handledScrollRequest = 0
+
+    private func scrollToCurrent(_ proxy: ScrollViewProxy) {
+        handledScrollRequest = vm.scrollToCurrentRequest
+        guard let id = vm.currentTrack?.id, vm.isCurrentTrackInList else { return }
+        // After the page has laid out (it may have just been opened)
+        DispatchQueue.main.async {
+            withAnimation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.9)) {
+                // Above the middle: the list runs on under the player bar,
+                // so its true center would sit half hidden behind it
+                proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.38))
             }
         }
     }
@@ -373,6 +383,8 @@ struct BrowseView: View {
                             HStack(spacing: 6) {
                                 TrackRow(track: track)
                                     .onTapGesture { vm.playFromQueue(track) }
+                                    .contextMenu { TrackMenuItems(track: track, showsPlay: false) }
+                                    .trackDraggable(track, vm: vm)
                                 Button { vm.removeFromQueue(track) } label: {
                                     Image(systemName: "xmark")
                                 }
@@ -516,12 +528,8 @@ private struct SearchResultsView: View {
     private func songRow(_ track: Track) -> some View {
         TrackRow(track: track)
             .onTapGesture { vm.open(.track(track)) }
-            .contextMenu {
-                Button("Play Next") { vm.enqueueNext(track) }
-                Button("Add to Queue") { vm.enqueueLast(track) }
-                Button("Go to Artist") { vm.searchText = ""; vm.goToArtist(of: track) }
-                Button("Go to Album") { vm.searchText = ""; vm.goToAlbum(of: track) }
-            }
+            .contextMenu { TrackMenuItems(track: track, showsPlay: false) }
+            .trackDraggable(track, vm: vm)
     }
 }
 
@@ -790,6 +798,8 @@ private struct TrackTile: View {
             badge: vm.currentTrack?.id == track.id ? (vm.isPlaying ? "Playing" : "Paused") : nil,
             onTap: onTap
         )
+        .contextMenu { TrackMenuItems(track: track, showsPlay: false) }
+        .trackDraggable(track, vm: vm)
     }
 }
 

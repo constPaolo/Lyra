@@ -606,10 +606,26 @@ final class PlayerViewModel {
 
     func goToArtist(of track: Track) {
         browsePage = .artist(name: artistKey(for: track))
+        if track.id == currentTrack?.id { requestScrollToCurrentTrack() }
     }
 
     func goToAlbum(of track: Track) {
         browsePage = .album(name: albumKey(for: track))
+        if track.id == currentTrack?.id { requestScrollToCurrentTrack() }
+    }
+
+    /// Bumped to ask the open track list to scroll to the playing song
+    /// ("Go to Song", or opening the album/artist of what's playing).
+    var scrollToCurrentRequest = 0
+
+    func requestScrollToCurrentTrack() {
+        scrollToCurrentRequest += 1
+    }
+
+    /// Whether the playing song is in the list on screen.
+    var isCurrentTrackInList: Bool {
+        guard let id = currentTrack?.id else { return false }
+        return filteredTracks.contains { $0.id == id }
     }
 
     private func syncSelectedSource() {
@@ -684,14 +700,62 @@ final class PlayerViewModel {
         return playlist.trackPaths.filter { available.contains($0) }.count
     }
 
-    func createPlaylist(named rawName: String) -> Playlist? {
+    func createPlaylist(named rawName: String, open: Bool = true) -> Playlist? {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return nil }
         let playlist = Playlist(name: name)
         playlists.append(playlist)
-        selectedSource = .playlist(id: playlist.id)
+        if open { selectedSource = .playlist(id: playlist.id) }
         return playlist
     }
+
+    /// "Add to Playlist → New Playlist": a "Playlist N" created with the
+    /// track in it. It stays on the current page; rename it from the sidebar.
+    func addToNewPlaylist(_ track: Track) {
+        let taken = Set(playlists.map(\.name))
+        var n = playlists.count + 1
+        while taken.contains("Playlist \(n)") { n += 1 }
+        guard let playlist = createPlaylist(named: "Playlist \(n)", open: false) else { return }
+        addTrack(track, toPlaylist: playlist.id)
+    }
+
+    func isTrack(_ track: Track, inPlaylist id: UUID) -> Bool {
+        guard let playlist = playlists.first(where: { $0.id == id }) else { return false }
+        return playlist.trackPaths.contains(normalizedPath(for: track.url))
+    }
+
+    func toggleTrack(_ track: Track, inPlaylist id: UUID) {
+        if isTrack(track, inPlaylist: id) {
+            removeTrack(track, fromPlaylist: id)
+        } else {
+            addTrack(track, toPlaylist: id)
+        }
+    }
+
+    // MARK: Drag and drop
+
+    /// Payload of a dragged track: a plain string, so it stays inside Lyra
+    /// (a file URL would also let Finder copy the song).
+    func dragPayload(for track: Track) -> String {
+        Self.trackDragPrefix + normalizedPath(for: track.url)
+    }
+
+    /// Adds dropped tracks to a playlist; returns false if none were tracks.
+    @discardableResult
+    func addDropped(_ payloads: [String], toPlaylist id: UUID) -> Bool {
+        let paths = payloads
+            .filter { $0.hasPrefix(Self.trackDragPrefix) }
+            .map { String($0.dropFirst(Self.trackDragPrefix.count)) }
+        guard !paths.isEmpty,
+              let idx = playlists.firstIndex(where: { $0.id == id }) else { return false }
+        var list = playlists[idx].trackPaths
+        for path in paths where !list.contains(path) { list.append(path) }
+        playlists[idx].trackPaths = list
+        return true
+    }
+
+    private static let trackDragPrefix = "lyra-track:"
+
 
     func renamePlaylist(id: UUID, to rawName: String) {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)

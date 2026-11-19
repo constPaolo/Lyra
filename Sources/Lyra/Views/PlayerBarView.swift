@@ -32,6 +32,13 @@ struct PlayerBarView: View {
             .padding(.top, 14)
             .padding(.bottom, 12)
             .tileBackground()
+            // Right-click anywhere on the bar (timeline included): the song's menu
+            .contentShape(Rectangle())
+            .contextMenu {
+                if let track = vm.currentTrack {
+                    TrackMenuItems(track: track, showsPlay: false)
+                }
+            }
         }
         .frame(height: 112)
         .padding(.horizontal, 20)
@@ -91,6 +98,9 @@ struct PlayerBarView: View {
                 if let track = vm.currentTrack {
                     Button("Go to Album") { vm.goToAlbum(of: track) }
                     Button("Go to Artist") { vm.goToArtist(of: track) }
+                    Divider()
+                    Button(vm.isLiked(track) ? "Unlike" : "Like") { vm.toggleLiked(track) }
+                    AddToPlaylistMenu(track: track)
                 }
             }
             if let track = vm.currentTrack {
@@ -103,6 +113,22 @@ struct PlayerBarView: View {
                 }
                 .buttonStyle(.plain)
                 .help(vm.isLiked(track) ? "Unlike" : "Like")
+
+                // Add the playing song to a playlist, right from the bar
+                Menu {
+                    AddToPlaylistItems(track: track)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.tertiary)
+                        .frame(width: 26, height: 26)
+                        .contentShape(Rectangle())
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Add to Playlist")
             }
         }
         .onHover { isHoveringNowPlaying = $0 }

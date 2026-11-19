@@ -14,6 +14,7 @@ import AppKit
 /// - `-LyraDemoPlay <title>`: start this song, muted
 /// - `-LyraDemoSeek <seconds>`: jump into the song
 /// - `-LyraDemoAppearance dark|light`
+/// - `-LyraDemoPinned YES`: keep the window floating on top
 @MainActor
 enum DemoMode {
     private static let args = UserDefaults.standard
@@ -36,6 +37,9 @@ enum DemoMode {
     }
 
     static func run(_ vm: PlayerViewModel, openSettings: () -> Void) async {
+        // Float above other windows, so a recording can run while another app
+        // keeps the keyboard focus.
+        if args.bool(forKey: "LyraDemoPinned") { vm.isPinned = true }
         guard let scene = args.string(forKey: "LyraDemo"), scene != "onboarding" else { return }
         // Wait for the library scan to finish.
         for _ in 0..<150 where vm.tracks.isEmpty || vm.isScanning {

@@ -6,6 +6,8 @@ struct SidebarView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var onOpenSettings: () -> Void = {}
     @State private var showDebug = false
+    /// Playlist under a song being dragged
+    @State private var dropTarget: UUID?
 
     var body: some View {
         ZStack {
@@ -101,11 +103,19 @@ struct SidebarView: View {
                                 icon: nil,
                                 title: playlist.name,
                                 count: vm.trackCount(in: playlist),
-                                isSelected: vm.browsePage == .playlist(id: playlist.id)
+                                isSelected: vm.browsePage == .playlist(id: playlist.id),
+                                isDropTarget: dropTarget == playlist.id
                             ) {
                                 vm.browsePage = .playlist(id: playlist.id)
                             }
                             .padding(.horizontal, 12)
+                            // Drop songs dragged from any list onto a playlist
+                            .dropDestination(for: String.self) { items, _ in
+                                vm.addDropped(items, toPlaylist: playlist.id)
+                            } isTargeted: { targeted in
+                                if targeted { dropTarget = playlist.id }
+                                else if dropTarget == playlist.id { dropTarget = nil }
+                            }
                             .contextMenu {
                                 Button("Rename Playlist") { renamePlaylist(playlist) }
                                 Button("Delete Playlist", role: .destructive) { vm.deletePlaylist(id: playlist.id) }
@@ -170,6 +180,7 @@ private struct SidebarRow: View {
     let title: String
     let count: Int?
     let isSelected: Bool
+    var isDropTarget = false
     let action: () -> Void
     @State private var isHovered = false
 
@@ -198,9 +209,15 @@ private struct SidebarRow: View {
             .frame(height: 34)
             .background(
                 Capsule().fill(
-                    isSelected ? Theme.chip : (isHovered ? Theme.ink.opacity(0.03) : .clear)
+                    isSelected || isDropTarget ? Theme.chip : (isHovered ? Theme.ink.opacity(0.03) : .clear)
                 )
             )
+            .overlay {
+                // A song is being dragged over this playlist
+                if isDropTarget {
+                    Capsule().strokeBorder(Theme.ink.opacity(0.5), lineWidth: 1.5)
+                }
+            }
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)

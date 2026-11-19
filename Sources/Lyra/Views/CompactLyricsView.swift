@@ -77,6 +77,7 @@ struct CompactLyricsView: View {
                     } else {
                         ForEach(vm.filteredTracks) { track in
                             compactTrackRow(track)
+                                .contextMenu { TrackMenuItems(track: track) }
                         }
                     }
                 }
