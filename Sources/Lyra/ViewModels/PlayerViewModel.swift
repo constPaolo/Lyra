@@ -80,10 +80,14 @@ final class PlayerViewModel {
     var volume: Float = 0.7
     var playbackQueue: [Track] = []
     var queueIndex: Int = -1
+    /// The queue in its natural order; `playbackQueue` is this, shuffled when
+    /// shuffle is on. Kept so turning shuffle off restores the original order.
+    private var unshuffledQueue: [Track] = []
     var isShuffleEnabled: Bool = false {
         didSet {
             UserDefaults.standard.set(isShuffleEnabled, forKey: Self.defaults.shuffleEnabled)
-            rebuildQueueKeepingCurrent()
+            guard oldValue != isShuffleEnabled else { return }
+            reorderQueueForShuffleChange()
         }
     }
     var repeatMode: RepeatMode = .off {
@@ -103,6 +107,19 @@ final class PlayerViewModel {
 
     var isSidebarVisible: Bool = true {
         didSet { UserDefaults.standard.set(isSidebarVisible, forKey: Self.defaults.sidebarVisible) }
+    }
+    /// Window too narrow for sidebar + content: the sidebar folds away on its
+    /// own and comes back when the window widens. Not persisted.
+    var isWindowNarrow = false {
+        didSet { if oldValue != isWindowNarrow { sidebarOpenWhileNarrow = false } }
+    }
+    /// Sidebar opened by hand while the window is narrow.
+    var sidebarOpenWhileNarrow = false
+    /// Whether the sidebar is actually on screen.
+    var isSidebarShown: Bool { isWindowNarrow ? sidebarOpenWhileNarrow : isSidebarVisible }
+
+    func toggleSidebar() {
+        if isWindowNarrow { sidebarOpenWhileNarrow.toggle() } else { isSidebarVisible.toggle() }
     }
     var isCompactMode: Bool = false {
         didSet {
@@ -715,6 +732,7 @@ final class PlayerViewModel {
             tracks = []
             filteredTracks = []
             playbackQueue = []
+            unshuffledQueue = []
             queueIndex = -1
             if currentTrack != nil {
                 removeObservers()
@@ -764,11 +782,27 @@ final class PlayerViewModel {
 
     // MARK: - Playback
 
+    /// Plays `track` and makes `queue` (or the current page) the new queue.
     func play(track: Track, queue: [Track]? = nil) {
+        prepareQueueForPlayback(startingWith: track, base: queue)
+        startPlayback(of: track)
+    }
+
+    /// Jumps to a track already in the queue without rebuilding (or
+    /// reshuffling) it.
+    func playFromQueue(_ track: Track) {
+        guard let idx = playbackQueue.firstIndex(of: track) else {
+            play(track: track)
+            return
+        }
+        queueIndex = idx
+        startPlayback(of: track)
+    }
+
+    private func startPlayback(of track: Track) {
         commitListen()
         lyricsTask?.cancel()
         removeObservers()
-        prepareQueueForPlayback(startingWith: track, base: queue)
 
         currentTrack = track
         duration = max(track.duration, 0.001)
@@ -865,8 +899,16 @@ final class PlayerViewModel {
     func enqueueNext(_ track: Track) {
         guard !playbackQueue.isEmpty else {
             playbackQueue = [track]
+            unshuffledQueue = [track]
             queueIndex = 0
             return
+        }
+        // Mirror the change in the natural order: right after the current track.
+        unshuffledQueue.removeAll { $0 == track }
+        if let current = currentTrack, let c = unshuffledQueue.firstIndex(of: current) {
+            unshuffledQueue.insert(track, at: c + 1)
+        } else {
+            unshuffledQueue.insert(track, at: 0)
         }
         if let existing = playbackQueue.firstIndex(of: track) {
             playbackQueue.remove(at: existing)
@@ -881,11 +923,13 @@ final class PlayerViewModel {
     func enqueueLast(_ track: Track) {
         if playbackQueue.contains(track) { return }
         playbackQueue.append(track)
+        unshuffledQueue.append(track)
     }
 
     func removeFromQueue(_ track: Track) {
         guard let idx = playbackQueue.firstIndex(of: track) else { return }
         playbackQueue.remove(at: idx)
+        unshuffledQueue.removeAll { $0 == track }
         if idx < queueIndex {
             queueIndex -= 1
         } else if idx == queueIndex {
@@ -977,7 +1021,7 @@ final class PlayerViewModel {
 
         guard let idx = previousIndex, idx >= 0, idx < playbackQueue.count else { return }
         queueIndex = idx
-        play(track: playbackQueue[idx])
+        startPlayback(of: playbackQueue[idx])
     }
 
     var upNextTracks: [Track] {
@@ -1301,7 +1345,9 @@ final class PlayerViewModel {
 
     private func prepareQueueForPlayback(startingWith track: Track, base inputBase: [Track]? = nil) {
         let source = inputBase ?? (filteredTracks.isEmpty ? tracks : filteredTracks)
-        let base = source.isEmpty ? [track] : source
+        var base = source.isEmpty ? [track] : source
+        if !base.contains(track) { base.insert(track, at: 0) }
+        unshuffledQueue = base
 
         if isShuffleEnabled {
             var remaining = base.filter { $0 != track }
@@ -1315,9 +1361,26 @@ final class PlayerViewModel {
         queueIndex = playbackQueue.firstIndex(of: track) ?? 0
     }
 
-    private func rebuildQueueKeepingCurrent() {
-        guard let currentTrack else { return }
-        prepareQueueForPlayback(startingWith: currentTrack)
+    /// Toggling shuffle reorders the queue in place: what was already played
+    /// stays behind, only the tracks still to come get shuffled (or restored
+    /// to their original order). The queue never switches to another page.
+    private func reorderQueueForShuffleChange() {
+        guard let current = currentTrack, !playbackQueue.isEmpty,
+              queueIndex >= 0, queueIndex < playbackQueue.count else { return }
+
+        if isShuffleEnabled {
+            let played = Array(playbackQueue.prefix(queueIndex + 1))
+            let upcoming = Array(playbackQueue.dropFirst(queueIndex + 1)).shuffled()
+            playbackQueue = played + upcoming
+        } else {
+            if !unshuffledQueue.isEmpty { playbackQueue = unshuffledQueue }
+            if let idx = playbackQueue.firstIndex(of: current) {
+                queueIndex = idx
+            } else {
+                playbackQueue.insert(current, at: 0)
+                queueIndex = 0
+            }
+        }
     }
 
     private func advanceToNextTrack(triggeredByEnd: Bool) {
@@ -1336,6 +1399,14 @@ final class PlayerViewModel {
         if queueIndex + 1 < playbackQueue.count {
             nextIndex = queueIndex + 1
         } else if repeatMode == .all {
+            // New lap in shuffle: a fresh order, never starting with the
+            // track that just ended.
+            if isShuffleEnabled && playbackQueue.count > 2 {
+                let last = playbackQueue[queueIndex]
+                var fresh = playbackQueue.shuffled()
+                if fresh.first == last { fresh.swapAt(0, fresh.count - 1) }
+                playbackQueue = fresh
+            }
             nextIndex = 0
         } else {
             nextIndex = nil
@@ -1350,7 +1421,7 @@ final class PlayerViewModel {
         }
 
         queueIndex = idx
-        play(track: playbackQueue[idx])
+        startPlayback(of: playbackQueue[idx])
     }
 
     private func syncQueueWithCurrentLibrary() {
@@ -1362,6 +1433,7 @@ final class PlayerViewModel {
 
         let byURL = Dictionary(uniqueKeysWithValues: tracks.map { ($0.url, $0) })
         playbackQueue = playbackQueue.compactMap { byURL[$0.url] }
+        unshuffledQueue = unshuffledQueue.compactMap { byURL[$0.url] }
 
         if let current = currentTrack {
             if let idx = playbackQueue.firstIndex(where: { $0.url == current.url }) {

@@ -52,6 +52,7 @@ struct ContentView: View {
             vm.setupRemoteCommands()
             vm.applyWindowPin()
             if vm.isCompactMode { applyCompactConstraints() } else { applyFullConstraints() }
+            installSizeGuard()
             await vm.restoreLastFolder()
             #if DEBUG
             await DemoMode.run(vm) { showSettings = true }
@@ -75,7 +76,7 @@ struct ContentView: View {
 
     private var fullLayout: some View {
         HStack(spacing: 0) {
-            if vm.isSidebarVisible {
+            if vm.isSidebarShown {
                 SidebarView(onOpenSettings: { showSettings = true })
                 .frame(width: 232)
                 .transition(.move(edge: .leading).combined(with: .opacity))
@@ -121,18 +122,25 @@ struct ContentView: View {
         .overlay(alignment: .topLeading) {
             Button {
                 withAnimation(reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.3, dampingFraction: 0.85)) {
-                    vm.isSidebarVisible.toggle()
+                    vm.toggleSidebar()
                 }
             } label: {
                 Image(systemName: "sidebar.left")
             }
             .buttonStyle(CircleIconButtonStyle())
-            .help(vm.isSidebarVisible ? "Hide sidebar" : "Show sidebar")
+            .help(vm.isSidebarShown ? "Hide sidebar" : "Show sidebar")
             .frame(height: Theme.topBarHeight)
             .padding(.leading, 84)
         }
         // The top bar shares the title bar row with the traffic lights.
         .ignoresSafeArea(edges: .top)
+        .onGeometryChange(for: Bool.self) { $0.size.width < Self.sidebarAutoHideWidth } action: { narrow in
+            withAnimation(reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.3, dampingFraction: 0.85)) {
+                vm.isWindowNarrow = narrow
+            }
+        }
+        // No .clipped() here: the top bar lives in the title bar area (outside
+        // the safe area) and clipping would hide search, compact and pin.
     }
 
     // MARK: - Main top bar
@@ -198,12 +206,67 @@ struct ContentView: View {
     private static let defaultCompactSize = CGSize(width: 320, height: 480)
     private static let defaultFullSize    = CGSize(width: 1200, height: 760)
 
+    static let fullMinSize    = CGSize(width: 750, height: 520)
+    static let compactMinSize = CGSize(width: 160, height: 200)
+    static let compactMaxSize = CGSize(width: 500, height: 900)
+    /// Below this window width the sidebar folds away on its own.
+    static let sidebarAutoHideWidth: CGFloat = 900
+
+    /// The app's main window. `NSApp.windows.first(where: isVisible)` can hit a
+    /// sheet or panel, so the first match is remembered and reused.
+    @MainActor private static weak var mainWindow: NSWindow?
+    /// True while `_doResize` swaps constraints, so the guard keeps out.
+    @MainActor private static var isSwitchingMode = false
+
+    @MainActor private static func resolveWindow() -> NSWindow? {
+        if let w = mainWindow, w.isVisible { return w }
+        let w = NSApp.windows.first { $0.isVisible && !$0.isSheet && !($0 is NSPanel) }
+        if w != nil { mainWindow = w }
+        return w
+    }
+
+    /// SwiftUI resyncs the window's min size from the root view (`minWidth: 1`)
+    /// whenever the content changes, wiping the AppKit constraints. Re-assert
+    /// them on every resize and grow the window back if it got below the minimum.
+    private func installSizeGuard() {
+        let vm = vm
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification, object: nil, queue: .main
+        ) { note in
+            // Posted on the main queue; the window is only touched there.
+            nonisolated(unsafe) let object = note.object
+            MainActor.assumeIsolated {
+                guard let window = object as? NSWindow,
+                      window === Self.resolveWindow(),
+                      !Self.isSwitchingMode else { return }
+                if vm.isCompactMode {
+                    if window.minSize != Self.compactMinSize { window.minSize = Self.compactMinSize }
+                    if window.maxSize != Self.compactMaxSize { window.maxSize = Self.compactMaxSize }
+                    return
+                }
+                let minSize = Self.fullMinSize
+                if window.minSize != minSize { window.minSize = minSize }
+                let frame = window.frame
+                guard frame.width < minSize.width || frame.height < minSize.height else { return }
+                // Grow after the current resize pass, not inside it.
+                DispatchQueue.main.async {
+                    guard !vm.isCompactMode, !Self.isSwitchingMode else { return }
+                    var f = window.frame
+                    let w = max(f.width, minSize.width), h = max(f.height, minSize.height)
+                    f.origin.y -= h - f.height
+                    f.size = CGSize(width: w, height: h)
+                    window.setFrame(f, display: true, animate: false)
+                }
+            }
+        }
+    }
+
     /// Constraints only, no resize: on launch the window already has the right size.
     private func applyCompactConstraints() {
         DispatchQueue.main.asyncAfter(deadline: .now()) {
-            guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
-            window.minSize = CGSize(width: 160, height: 200)
-            window.maxSize = CGSize(width: 500, height: 900)
+            guard let window = Self.resolveWindow() else { return }
+            window.minSize = Self.compactMinSize
+            window.maxSize = Self.compactMaxSize
             Self.configureTitlebar(window, compact: true)
         }
     }
@@ -212,8 +275,8 @@ struct ContentView: View {
     /// view's `minWidth: 1` and can be dragged down to a few pixels.
     private func applyFullConstraints() {
         DispatchQueue.main.asyncAfter(deadline: .now()) {
-            guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
-            window.minSize = CGSize(width: 750, height: 520)
+            guard let window = Self.resolveWindow() else { return }
+            window.minSize = Self.fullMinSize
             window.maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude,
                                     height: CGFloat.greatestFiniteMagnitude)
             Self.configureTitlebar(window, compact: false)
@@ -241,18 +304,20 @@ struct ContentView: View {
     }
 
     private func _doResize(compact: Bool) {
-        guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
+        guard let window = Self.resolveWindow() else { return }
+        Self.isSwitchingMode = true
         if compact {
             // Save current full-mode frame before switching
             saveFrame(window.frame, key: Self.fullFrameKey)
             Self.configureTitlebar(window, compact: true)
 
-            window.minSize = CGSize(width: 160, height: 200)
-            window.maxSize = CGSize(width: 500, height: 900)
+            window.minSize = Self.compactMinSize
+            window.maxSize = Self.compactMaxSize
 
             let target = savedFrame(key: Self.compactFrameKey)
                 ?? centeredFrame(size: Self.defaultCompactSize, in: window)
             window.setFrame(target, display: true, animate: true)
+            Self.isSwitchingMode = false
         } else {
             // Save current compact frame before switching
             saveFrame(window.frame, key: Self.compactFrameKey)
@@ -262,11 +327,16 @@ struct ContentView: View {
             window.maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude,
                                     height: CGFloat.greatestFiniteMagnitude)
 
-            let target = savedFrame(key: Self.fullFrameKey)
+            var target = savedFrame(key: Self.fullFrameKey)
                 ?? centeredFrame(size: Self.defaultFullSize, in: window)
+            // A frame saved while the min size was lost could be too small.
+            if target.width < Self.fullMinSize.width || target.height < Self.fullMinSize.height {
+                target = centeredFrame(size: Self.defaultFullSize, in: window)
+            }
             window.setFrame(target, display: true, animate: false)
             DispatchQueue.main.async {
-                window.minSize = CGSize(width: 750, height: 520)
+                window.minSize = Self.fullMinSize
+                Self.isSwitchingMode = false
             }
         }
     }

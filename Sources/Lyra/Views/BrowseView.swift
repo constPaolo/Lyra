@@ -52,7 +52,7 @@ struct BrowseView: View {
                     .padding(.top, 36)
 
                 // The sidebar already lists these; show them only when it's hidden.
-                if !vm.isSidebarVisible {
+                if !vm.isSidebarShown {
                     quickChips
                 }
 
@@ -372,7 +372,7 @@ struct BrowseView: View {
                         ForEach(vm.upNextTracks) { track in
                             HStack(spacing: 6) {
                                 TrackRow(track: track)
-                                    .onTapGesture { vm.play(track: track) }
+                                    .onTapGesture { vm.playFromQueue(track) }
                                 Button { vm.removeFromQueue(track) } label: {
                                     Image(systemName: "xmark")
                                 }
